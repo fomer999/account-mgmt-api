@@ -1,0 +1,30 @@
+.gradle
+gradle.properties
+build/
+ops/
+!gradle/wrapper/gradle-wrapper.jar
+src/main/resources
+
+*.DS_Store
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+# Cucumber
+cucumber-logs/
+
+
+# Terraform
+ops/terraform/.terraform*
+ops/terraform/terraform*
