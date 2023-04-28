@@ -1,0 +1,153 @@
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'application'
+apply plugin: 'fpm-packaging'
+apply plugin: 'org.springframework.boot'
+
+group = 'com.lf'
+sourceCompatibility = 1.8
+// Configure the versioner for builds
+ext.gitVersioner = [
+        defaultBranch           : "master",                                         // Default "master"
+        stableBranches          : ["master"],                                       // default [], the feature branch postfix (-dm4(6)) will not be appended on stable branches, all commits are included into the version number calculation
+        snapshotEnabled         : "$isLocalBuild".toBoolean(),                      // Enable this to include the "-SNAPSHOT" postfix, if you are working on your build.local.gradle file set this to true
+        localChangesCountEnabled: "$localChangesCountEnabled".toBoolean(),          // Default false, the (<commitCount>) before -SNAPSHOT, change this to true if your using a build.local.gradle
+        shortName: { gitVersion ->                                                  // Will be used for creating the correct maven repo name.
+            return gitVersion.branchName
+        }
+]
+apply from: 'scripts/git-versioner.gradle'
+// Either build the release off the Jenkins BUILD_NUMBER or else the git version name
+version = ("$buildMajorVersion" + (System.getenv('BUILD_NUMBER') ?: "$gitVersionName")).toString()
+def CLOUDSMITH_REPO_URL = ""
+
+buildscript {
+    ext {
+        springBootVersion = '2.3.3.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.kenshoo:gradle-fpm:0.5")
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+    }
+}
+
+/**
+ * Unlike using local maven, your dependencies will be cached and not checked for updates very often. Change the time
+ * to control how long your specific maven repository pulled from Cloudsmith will be cached for.
+ */
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'minutes'
+}
+
+bootRun {
+    // support passing -Dsystem.property=value to bootRun task
+    systemProperties = System.properties
+}
+
+compileJava {
+    options.compilerArgs << "-Xlint:unchecked" << "-Xlint:deprecation"
+}
+
+// CloudSmith Configuration for the cloudsmith-maven-wagon
+configurations {
+    deployerJars
+}
+
+dependencies {
+    // CloudSmith
+    deployerJars 'io.cloudsmith.maven.wagon:cloudsmith-maven-wagon:0.2.0'
+
+    // Spring Deps
+    compile 'org.springframework.boot:spring-boot-starter-web:2.3.3.RELEASE'
+    //compile 'org.springframework.boot:spring-boot-starter-security:2.3.3.RELEASE'
+    compile 'org.springframework.boot:spring-boot-starter-actuator:2.3.3.RELEASE'
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-autoconfigure
+    compile group: 'org.springframework.boot', name: 'spring-boot-autoconfigure', version: '2.3.3.RELEASE'
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-actuator-autoconfigure
+    compile group: 'org.springframework.boot', name: 'spring-boot-actuator-autoconfigure', version: '2.3.3.RELEASE'
+
+    compile 'org.springframework.boot:spring-boot-starter-thymeleaf:2.3.3.RELEASE'
+
+    // https://mvnrepository.com/artifact/javax.validation/validation-api
+    compile group: 'javax.validation', name: 'validation-api', version: '2.0.1.Final'
+    // https://mvnrepository.com/artifact/org.springframework.security.oauth.boot/spring-security-oauth2-autoconfigure
+    compile group: 'org.springframework.security.oauth.boot', name: 'spring-security-oauth2-autoconfigure', version: '2.3.4.RELEASE'
+
+    // https://mvnrepository.com/artifact/org.apache.httpcomponents/httpclient
+    compile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5.13'
+
+    // https://mvnrepository.com/artifact/org.springframework.security/spring-security-test
+    testCompile group: 'org.springframework.security', name: 'spring-security-test', version: '5.4.1'
+
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-test
+    testCompile group: 'org.springframework.boot', name: 'spring-boot-starter-test', version: '2.3.5.RELEASE'
+
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-oauth2-client
+    compile group: 'org.springframework.boot', name: 'spring-boot-starter-oauth2-client', version: '2.2.6.RELEASE'
+
+    // https://mvnrepository.com/artifact/com.microsoft.azure/msal4j
+    compile group: 'com.microsoft.azure', name: 'msal4j', version: '1.8.0'
+
+    testCompile group: 'org.mockito', name: 'mockito-core', version: '2.10.0'
+
+    compile 'com.azure:azure-spring-data-cosmos:3.0.0'
+
+    // https://mvnrepository.com/artifact/com.microsoft.azure/spring-data-cosmosdb
+    implementation group: 'com.microsoft.azure', name: 'spring-data-cosmosdb', version: '3.0.0.M1'
+
+    // Validator
+    compile "javax.validation:validation-api:1.1.0.Final"
+
+    // Guava
+    compile group: 'com.google.guava', name: 'guava', version: '19.0'
+
+    // Jackson
+    compile 'com.fasterxml.jackson.core:jackson-annotations:2.8.6'
+
+    // Commons
+    compile 'org.apache.commons:commons-lang3:3.5'
+    compile 'commons-validator:commons-validator:1.4.1'
+
+    // Bouncy Castle
+    compile group: 'org.bouncycastle', name: 'bcpkix-jdk15on', version: '1.59'
+
+    // Swagger
+    compile "io.springfox:springfox-swagger2:2.6.1"
+    compile "io.springfox:springfox-swagger-ui:2.6.1"
+
+    compile group: 'com.sun.mail', name: 'javax.mail', version: '1.6.2'
+}
+
+/**
+ * Builds a fat-jar of the AMA classes + depedencies.
+ */
+jar {
+    baseName = "account-mgmt-api"
+
+    from(configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+    }
+
+    manifest {
+        attributes 'Implementation-Title': 'ACCOUNT MANAGEMENT APIs',
+                'Implementation-Version': version,
+                'Built-Date': new Date(),
+                'Built-JDK': System.getProperty('java.version'),
+                'Main-Class': 'com.lf.LfCdnApiApplication'
+    }
+}
+
+def installer = install.repositories.mavenInstaller
+def deployer  = uploadArchives.repositories.mavenDeployer
+uploadArchives.dependsOn build
+
+
+
+
+
