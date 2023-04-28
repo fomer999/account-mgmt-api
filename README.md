@@ -1,21 +1,14 @@
 Note: This is a Java Springboot application that uses its embedded tomcat as the web server.
-Dlvr uses Rancher/CircleCi/DockerHub container and build management setup to deploy this application.
-A developer can run this application locally using the commands mentioned below.
-A datastore (CosmosDB) and SSL (Java Keystore)
-needs to be setup for Lionfish before this application can be used.
 
-
-# lf-cdn-api
+# account-mgmt-api
 This is a Java Springboot aaplication that exposes REST API endpoints. We have endpoints for:
-(1) Cache Purge
-(2) Customer Account Management
-(3) Customer Configuration Management
-(4) User Management
+(1) Customer Account Management (Every Account has a parent. This enables support for hierarchical Accounts)
+(2) Customer Configuration Management (One Account can have multiple Configurations associated with it)
+(3) User Management (One Account can have multiple Users associated with it)
 
 API SECURITY
 The authentication/authorization of API endpoints is handled using OAuth.
 Each API endpoint requires a security-context to be passed in via the "X-Security-Context" header.
-The value for this header is obtained by hitting the in-house OAuth server (see code here git@40.127.136.217:lf-oauth-server.git)
 Endpoint Authorization is defined by Roles assigned to the logged-in user. These Role assignments are stored as part of the User entity.
 
 PROJECT CONFIG PROPERTIES
